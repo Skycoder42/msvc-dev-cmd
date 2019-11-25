@@ -8,17 +8,6 @@ const process = require('process')
 const MSVS_2017 = '%ProgramFiles(x86)%\\Microsoft Visual Studio\\2017\\Enterprise\\VC\\Auxiliary\\Build'
 const MSVS_2019 = '%ProgramFiles(x86)%\\Microsoft Visual Studio\\2019\\Enterprise\\VC\\Auxiliary\\Build'
 
-const InterestingVariables = [
-    'INCLUDE',
-    'LIB',
-    'LIBPATH',
-    'Path',
-    'Platform',
-    /^VCTools/,
-    /^VSCMD_/,
-    /^WindowsSDK/i,
-]
-
 async function main() {
     if (process.platform != 'win32') {
         core.info('This is not a Windows virtual environment, bye!')
@@ -54,15 +43,15 @@ async function main() {
 
     core.debug(`Writing helper file: ${helper}`)
     await fs.writeFile(helper, `
-        @IF EXIST "${MSVS_2017}\\vcvarsall.bat" GOTO :2017
         @IF EXIST "${MSVS_2019}\\vcvarsall.bat" GOTO :2019
+        @IF EXIST "${MSVS_2017}\\vcvarsall.bat" GOTO :2017
         @ECHO "Microsoft Visual Studio not found"
         @EXIT 1
-        :2017
-        @CALL "${MSVS_2017}\\vcvarsall.bat" ${args.join(' ')}
-        @GOTO ENV
         :2019
-        @CALL "${MSVS_2019}\\vcvarsall.bat" ${args.join(' ')}
+        CALL "${MSVS_2019}\\vcvarsall.bat" ${args.join(' ')}
+        @GOTO ENV
+        :2017
+        CALL "${MSVS_2017}\\vcvarsall.bat" ${args.join(' ')}
         @GOTO ENV
         :ENV
         @IF ERRORLEVEL 1 EXIT
@@ -86,11 +75,9 @@ async function main() {
 
     for (let string of environment) {
         const [name, value] = string.split('=')
-        for (let pattern of InterestingVariables) {
-            if (name.match(pattern)) {
-                core.exportVariable(name, value)
-                break
-            }
+        if (process.env[name] != value) {
+            core.debug(`Exporting env var ${name}=${value}`);
+            core.exportVariable(name, value);
         }
     }
 
